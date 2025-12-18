@@ -119,7 +119,7 @@ show_samples(lr, hr)
 
 8:
 base_generator = build_srresnet()
-base_generator.load_weights(PRETRAINED_GEN)
+base_generator.load_weights(weights\srresnet_finetuned_v6.weights.h5)
 
 9:
 from train_srgan import train_step_srgan

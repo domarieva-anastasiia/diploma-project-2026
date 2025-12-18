@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Conv2D, BatchNormalization, Add, Lambda, PReLU
-from utils.normalization import normalize_01, denormalize_m11
+from utils.normalization import normalize_m11, denormalize_m11
 
 
 upsamples_per_scale = {
@@ -37,7 +37,7 @@ def build_srresnet(scale=4, num_filters=64, num_res_blocks=16):
     num_upsamples = upsamples_per_scale[scale]
 
     lr = Input(shape=(None, None, 3))
-    x = Lambda(normalize_01)(lr)
+    x = Lambda(normalize_m11)(lr)
 
     x = Conv2D(num_filters, kernel_size=9, padding='same')(x)
     x = x_1 = PReLU(shared_axes=[1, 2])(x)
