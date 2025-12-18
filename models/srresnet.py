@@ -10,15 +10,6 @@ upsamples_per_scale = {
     8: 3
 }
 
-
-pretrained_srresnet_models = {
-    "srresnet_bicubic_x4": {
-        "url": "https://image-super-resolution-weights.s3.af-south-1.amazonaws.com/srresnet_bicubic_x4/generator.h5",
-        "scale": 4
-    }
-}
-
-
 def pixel_shuffle(scale):
     return lambda x: tf.nn.depth_to_space(x, scale)
 

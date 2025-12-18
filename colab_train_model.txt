@@ -1,0 +1,240 @@
+0:
+# Навчання SRGAN у середовищі Google Colab
+
+У даному ноутбуці реалізовано навчання моделі SRGAN із використанням
+попередньо навченого генератора SRResNet та різних архітектур дискримінаторів.
+Навчання проводиться у кілька незалежних експериментів із фіксованими
+початковими вагами генератора.
+
+1:
+import sys
+import tensorflow as tf
+
+print("Python:", sys.version)
+print("TensorFlow:", tf.__version__)
+print("GPU:", tf.config.list_physical_devices('GPU'))
+
+
+2:
+!git clone https://github.com/domarieva-anastasiia/diploma-project-2026.git
+%cd diploma-project-2026
+
+
+3:
+import os
+import time
+import numpy as np
+import matplotlib.pyplot as plt
+
+import tensorflow as tf
+from tensorflow.keras import optimizers
+
+
+4:
+from models.srresnet import build_srresnet
+from models.discriminator_base import build_discriminator_base
+from models.discriminator_gap import build_discriminator_gap
+from models.discriminator_patchgan import build_discriminator_patchgan
+
+
+5:
+# Dataset
+SCALE = 4
+PATCH_SIZE = 96
+BATCH_SIZE = 8
+
+# Training
+EPOCHS_GAN = 50
+GEN_LR = 1e-4
+DISC_LR = 1e-4
+
+LAMBDA_ADV = 1e-3
+LAMBDA_PIXEL = 0.0
+
+
+# Paths
+WEIGHTS_DIR = "weights"
+os.makedirs(WEIGHTS_DIR, exist_ok=True)
+os.makedirs(LOGS_DIR, exist_ok=True)
+
+
+5.2:
+import tensorflow_datasets as tfds
+
+def load_div2k(subset="train", batch_size=8, patch_size=96, scale=4):
+    """Завантажує DIV2K та повертає tf.data.Dataset з LR і HR патчами"""
+    
+    ds = tfds.load("div2k/bicubic_x4", split=subset, as_supervised=True)
+    
+    def preprocess(lr, hr):
+        lr = tf.image.random_crop(lr, [patch_size, patch_size, 3])
+        hr = tf.image.random_crop(hr, [patch_size*scale, patch_size*scale, 3])
+        lr = tf.cast(lr, tf.float32) / 255.0
+        hr = tf.cast(hr, tf.float32) / 255.0
+        return lr, hr
+
+    ds = ds.map(preprocess, num_parallel_calls=tf.data.AUTOTUNE)
+    ds = ds.shuffle(100).batch(batch_size).prefetch(tf.data.AUTOTUNE)
+    return ds
+
+
+5.3:
+import matplotlib.pyplot as plt
+
+def show_samples(lr, hr, n=3):
+    """Показує n прикладів LR → HR"""
+    plt.figure(figsize=(12, 4))
+    for i in range(n):
+        plt.subplot(2, n, i+1)
+        plt.imshow(lr[i])
+        plt.title("LR")
+        plt.axis("off")
+        plt.subplot(2, n, i+1+n)
+        plt.imshow(hr[i])
+        plt.title("HR")
+        plt.axis("off")
+    plt.show()
+
+
+6:
+train_ds = load_div2k(
+    subset="train",
+    batch_size=BATCH_SIZE,
+    patch_size=PATCH_SIZE,
+    scale=SCALE
+)
+
+val_ds = load_div2k(
+    subset="validation",
+    batch_size=1,
+    patch_size=PATCH_SIZE,
+    scale=SCALE
+)
+
+
+7:
+lr, hr = next(iter(train_ds))
+show_samples(lr, hr)
+
+
+8:
+base_generator = build_srresnet()
+base_generator.load_weights(PRETRAINED_GEN)
+
+9:
+from train_srgan import train_step_srgan
+from training.losses import content_loss
+
+
+# - - - DISCRIMINATOR-BASE - - -
+A.1 :
+gen_A = tf.keras.models.clone_model(base_generator)
+gen_A.set_weights(base_generator.get_weights())
+
+disc_A = build_discriminator_base()
+
+g_opt_A = optimizers.Adam(GEN_LR)
+d_opt_A = optimizers.Adam(DISC_LR)
+
+
+A.2 :
+for epoch in range(EPOCHS_GAN):
+    start = time.time()
+
+    for lr, hr in train_ds:
+        metrics = train_step_srgan(
+            lr_images=lr,
+            hr_images=hr,
+            generator=gen_A,
+            discriminator=disc_A,
+            g_optimizer=g_opt_A,
+            d_optimizer=d_opt_A,
+            content_loss_fn=content_loss,
+            lambda_adv=LAMBDA_ADV,
+            lambda_pixel=LAMBDA_PIXEL,
+        )
+
+    print(
+        f"[BASE][Epoch {epoch+1}/{EPOCHS_GAN}] "
+        f"G={metrics['g_total']:.4f} | "
+        f"D={metrics['d_loss']:.4f} | "
+        f"PSNR={metrics['psnr']:.2f} | "
+        f"SSIM={metrics['ssim']:.3f} | "
+        f"time={time.time() - start:.1f}s"
+    )
+
+
+# - - - DISCRIMINATOR-GAP - - -
+B.1:
+gen_B = tf.keras.models.clone_model(base_generator)
+gen_B.set_weights(base_generator.get_weights())
+
+disc_B = build_discriminator_gap()
+
+g_opt_B = optimizers.Adam(GEN_LR)
+d_opt_B = optimizers.Adam(DISC_LR)
+
+
+B.2: 
+for epoch in range(EPOCHS_GAN):
+    start = time.time()
+
+    for lr, hr in train_ds:
+        metrics = train_step_srgan(
+            lr_images=lr,
+            hr_images=hr,
+            generator=gen_B,
+            discriminator=disc_B,
+            g_optimizer=g_opt_B,
+            d_optimizer=d_opt_B,
+            content_loss_fn=content_loss,
+            lambda_adv=LAMBDA_ADV,
+            lambda_pixel=LAMBDA_PIXEL,
+        )
+
+    print(
+        f"[GAP][Epoch {epoch+1}/{EPOCHS_GAN}] "
+        f"G={metrics['g_total']:.4f} | "
+        f"D={metrics['d_loss']:.4f} | "
+        f"PSNR={metrics['psnr']:.2f} | "
+        f"SSIM={metrics['ssim']:.3f} | "
+        f"time={time.time() - start:.1f}s"
+    )
+
+
+# - - - DISCRIMINATOR-PATCHGAN - - -
+C.1:
+gen_C = tf.keras.models.clone_model(base_generator)
+gen_C.set_weights(base_generator.get_weights())
+
+disc_C = build_discriminator_patchgan()
+
+g_opt_C = optimizers.Adam(GEN_LR)
+d_opt_C = optimizers.Adam(DISC_LR)
+
+
+C.3:
+for epoch in range(EPOCHS_GAN):
+    start = time.time()
+
+    for lr, hr in train_ds:
+        metrics = train_step_srgan(
+            lr_images=lr,
+            hr_images=hr,
+            generator=gen_C,
+            discriminator=disc_C,
+            g_optimizer=g_opt_C,
+            d_optimizer=d_opt_C,
+            content_loss_fn=content_loss,
+            lambda_adv=LAMBDA_ADV,
+            lambda_pixel=LAMBDA_PIXEL,
+        )
+
+    print(
+        f"[PATCHGAN][Epoch {epoch+1}/{EPOCHS_GAN}] "
+        f"G={metrics['g_total']:.4f} | "
+        f"D={metrics['d_loss']:.4f} | "
+        f"PSNR={metrics['psnr']:.2f} | "
+        f"SSIM={metrics['ssim']:.3f} | "
+        f"time={time.time() - start:.1f}s"
+    )
