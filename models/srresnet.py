@@ -40,7 +40,8 @@ def build_srresnet(scale=4, num_filters=64, num_res_blocks=16):
     x = Lambda(normalize_m11)(lr)
 
     x = Conv2D(num_filters, kernel_size=9, padding='same')(x)
-    x = x_1 = PReLU(shared_axes=[1, 2])(x)
+    x_1 = x
+    x = PReLU(shared_axes=[1, 2])(x)
 
     for _ in range(num_res_blocks):
         x = residual_block(x, num_filters)
@@ -53,7 +54,9 @@ def build_srresnet(scale=4, num_filters=64, num_res_blocks=16):
         x = upsample(x, num_filters * 4)
 
     #x = Conv2D(3, kernel_size=9, padding='same', activation='tanh')(x)
-    x = Conv2D(3, kernel_size=9, padding='same')(x)
-    sr = Lambda(denormalize_m11)(x)
+    #x = Conv2D(3, kernel_size=9, padding='same')(x)
+    #sr = Lambda(denormalize_m11)(x)
+    sr = Conv2D(3, kernel_size=9, padding="same", activation="tanh")(x)
+
 
     return Model(lr, sr)
