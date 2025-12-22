@@ -36,8 +36,8 @@ def build_srresnet(scale=4, num_filters=64, num_res_blocks=16):
 
     num_upsamples = upsamples_per_scale[scale]
 
-    lr = Input(shape=(None, None, 3))
-    x = Lambda(normalize_m11)(lr)
+    lr = Input(shape=(None, None, 3)) # expects [0,1]
+    #x = Lambda(normalize_m11)(lr)
 
     x = Conv2D(num_filters, kernel_size=9, padding='same')(x)
     x_1 = x
@@ -56,7 +56,7 @@ def build_srresnet(scale=4, num_filters=64, num_res_blocks=16):
     #x = Conv2D(3, kernel_size=9, padding='same', activation='tanh')(x)
     #x = Conv2D(3, kernel_size=9, padding='same')(x)
     #sr = Lambda(denormalize_m11)(x)
-    sr = Conv2D(3, kernel_size=9, padding="same", activation="tanh")(x)
+    sr = Conv2D(3, kernel_size=9, padding="same", activation="sigmoid")(x)
 
 
     return Model(lr, sr)
