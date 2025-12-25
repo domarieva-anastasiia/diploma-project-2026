@@ -27,12 +27,13 @@ class ContentLoss(tf.keras.losses.Loss):
         self.mse = tf.keras.losses.MeanSquaredError()
 
     def call(self, y_true, y_pred):
-        # VGG expects inputs in range [0, 255] and preprocessed
-        y_true = tf.clip_by_value(y_true, 0.0, 1.0)
-        y_pred = tf.clip_by_value(y_pred, 0.0, 1.0)
+        # y_true, y_pred: [0,255], float32
 
-        y_true = preprocess_input(y_true * 255.0)
-        y_pred = preprocess_input(y_pred * 255.0)
+        y_true = tf.clip_by_value(y_true, 0.0, 255.0)
+        y_pred = tf.clip_by_value(y_pred, 0.0, 255.0)
+
+        y_true = preprocess_input(y_true)
+        y_pred = preprocess_input(y_pred)
 
         true_features = self.vgg(y_true)
         pred_features = self.vgg(y_pred)
@@ -42,8 +43,9 @@ class ContentLoss(tf.keras.losses.Loss):
 
 
 def pixel_loss(y_true, y_pred):
-    y_pred = tf.clip_by_value(y_pred, 0.0, 1.0)
-    return tf.reduce_mean(tf.square(y_true - y_pred))
+    y_true = tf.clip_by_value(y_true, 0.0, 255.0)
+    y_pred = tf.clip_by_value(y_pred, 0.0, 255.0)
+    return tf.reduce_mean(tf.abs(y_true - y_pred))  # L1 краще для SR
 
 
 
@@ -89,15 +91,18 @@ def generator_loss(
     - lambda_pixel: weight for pixel loss (optional)
     """
 
-    sr_clipped = tf.clip_by_value(sr, 0.0, 1.0)
+     # sr, hr: [0,255]
 
-    l_content = content_loss_fn(hr, sr_clipped)
+    sr = tf.clip_by_value(sr, 0.0, 255.0)
+    hr = tf.clip_by_value(hr, 0.0, 255.0)
+
+    l_content = content_loss_fn(hr, sr)
     l_adv = generator_adversarial_loss(d_fake)
 
     total_loss = l_content + lambda_adv * l_adv
 
     if lambda_pixel > 0.0:
-        l_pixel = pixel_loss(hr, sr_clipped)
+        l_pixel = pixel_loss(hr, sr)
         total_loss += lambda_pixel * l_pixel
     else:
         l_pixel = tf.constant(0.0)

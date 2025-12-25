@@ -4,6 +4,24 @@ from training.losses import generator_loss, discriminator_loss
 from training.metrics import psnr_metric, ssim_metric
 
 
+def preprocess_srgan(lr, hr, hr_crop_size=256, scale=4):
+
+    hr = tf.image.random_crop(
+        hr,
+        [hr_crop_size, hr_crop_size, 3]
+    )
+
+    lr = tf.image.random_crop(
+        lr,
+        [hr_crop_size // scale, hr_crop_size // scale, 3]
+    )
+
+    lr = tf.cast(lr, tf.float32) #без нормалізації
+    hr = tf.cast(hr, tf.float32)
+
+    return lr, hr
+
+
 @tf.function
 def train_step_srgan(
     lr_images,
@@ -21,9 +39,12 @@ def train_step_srgan(
 
         sr_images = generator(lr_images, training=True)
 
+        #нормалізація для дискримінатора
+        hr_d = hr_images / 255.0
+        sr_d = sr_images / 255.0
 
-        d_real = discriminator(hr_images, training=True)
-        d_fake = discriminator(sr_images, training=True)
+        d_real = discriminator(hr_d, training=True)
+        d_fake = discriminator(sr_d, training=True)
 
 
         d_loss = discriminator_loss(d_real, d_fake)

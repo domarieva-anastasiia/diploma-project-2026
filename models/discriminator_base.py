@@ -6,7 +6,7 @@ from utils.discriminator_blocks import discriminator_block
 
 
 def build_discriminator_base(hr_crop_size):
-    x_in = Input(shape=(hr_crop_size, hr_crop_size, 3)) #[0,1]
+    x_in = Input(shape=(hr_crop_size, hr_crop_size, 3))
 
     x = discriminator_block(x_in, 64, batchnorm=False)
     x = discriminator_block(x, 64, strides=2)
