@@ -18,20 +18,14 @@ def train_step_srgan(
 ):
     
     with tf.GradientTape(persistent=True) as tape:
-        # ----------------------------------
-        # Generator forward
-        # ----------------------------------
+
         sr_images = generator(lr_images, training=True)
 
-        # ----------------------------------
-        # Discriminator forward
-        # ----------------------------------
+
         d_real = discriminator(hr_images, training=True)
         d_fake = discriminator(sr_images, training=True)
 
-        # ----------------------------------
-        # Losses
-        # ----------------------------------
+
         d_loss = discriminator_loss(d_real, d_fake)
 
         g_total_loss, g_loss_dict = generator_loss(
@@ -43,18 +37,14 @@ def train_step_srgan(
             lambda_pixel=lambda_pixel,
         )
 
-    # ----------------------------------
-    # Gradients & updates
-    # ----------------------------------
+
     g_grads = tape.gradient(g_total_loss, generator.trainable_variables)
     d_grads = tape.gradient(d_loss, discriminator.trainable_variables)
 
     g_optimizer.apply_gradients(zip(g_grads, generator.trainable_variables))
     d_optimizer.apply_gradients(zip(d_grads, discriminator.trainable_variables))
 
-    # ----------------------------------
-    # Metrics
-    # ----------------------------------
+  
     psnr = psnr_metric(hr_images, sr_images)
     ssim = ssim_metric(hr_images, sr_images)
 

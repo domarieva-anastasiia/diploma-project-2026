@@ -2,9 +2,6 @@ import tensorflow as tf
 from tensorflow.keras.applications import VGG19
 from tensorflow.keras.applications.vgg19 import preprocess_input
 
-# --------------------------------------------------
-# Content / Perceptual loss (VGG19)
-# --------------------------------------------------
 
 def build_vgg19(layer_name="block5_conv4"):
     """
@@ -43,18 +40,13 @@ class ContentLoss(tf.keras.losses.Loss):
         return self.mse(true_features, pred_features)
 
 
-# --------------------------------------------------
-# Pixel loss (optional)
-# --------------------------------------------------
 
 def pixel_loss(y_true, y_pred):
     y_pred = tf.clip_by_value(y_pred, 0.0, 1.0)
     return tf.reduce_mean(tf.square(y_true - y_pred))
 
 
-# --------------------------------------------------
-# Adversarial losses (GAN)
-# --------------------------------------------------
+
 
 bce = tf.keras.losses.BinaryCrossentropy(from_logits=False)
 
@@ -76,9 +68,6 @@ def generator_adversarial_loss(d_fake):
     return bce(tf.ones_like(d_fake), d_fake)
 
 
-# --------------------------------------------------
-# Combined generator loss (SRGAN)
-# --------------------------------------------------
 
 def generator_loss(
     sr,
