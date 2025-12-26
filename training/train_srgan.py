@@ -22,7 +22,7 @@ def preprocess_srgan(lr, hr, hr_crop_size=256, scale=4):
     return lr, hr
 
 
-@tf.function
+
 def train_step_srgan(
     lr_images,
     hr_images,
