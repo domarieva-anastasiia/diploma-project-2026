@@ -28,8 +28,8 @@ class ContentLoss(tf.keras.losses.Loss):
 
     def call(self, y_true, y_pred):
         # VGG expects inputs in range [0, 255] and preprocessed
-        y_true = tf.clip_by_value(y_true, 0.0, 1.0)
-        y_pred = tf.clip_by_value(y_pred, 0.0, 1.0)
+        # y_true = tf.clip_by_value(y_true, 0.0, 1.0)
+        # y_pred = tf.clip_by_value(y_pred, 0.0, 1.0)
 
         y_true = preprocess_input(y_true * 255.0)
         y_pred = preprocess_input(y_pred * 255.0)
@@ -42,10 +42,7 @@ class ContentLoss(tf.keras.losses.Loss):
 
 
 def pixel_loss(y_true, y_pred):
-    y_pred = tf.clip_by_value(y_pred, 0.0, 1.0)
     return tf.reduce_mean(tf.square(y_true - y_pred))
-
-
 
 
 bce = tf.keras.losses.BinaryCrossentropy(from_logits=False)
@@ -70,8 +67,8 @@ def generator_adversarial_loss(d_fake):
 
 
 def generator_loss(
-    sr,
-    hr,
+    sr, #[0, 255]
+    hr, #[0, 255]
     d_fake,
     content_loss_fn,
     lambda_adv=1e-3,
@@ -89,15 +86,20 @@ def generator_loss(
     - lambda_pixel: weight for pixel loss (optional)
     """
 
-    sr_clipped = tf.clip_by_value(sr, 0.0, 1.0)
+    #normalize from [0, 255] to [0, 1] to content loss
+    hr_norm = hr / 255.0
+    sr_norm = sr / 255.0
 
-    l_content = content_loss_fn(hr, sr_clipped)
+    sr_norm_clip = tf.clip_by_value(sr_norm, 0.0, 1.0)
+    hr_norm_clip = tf.clip_by_value(hr_norm, 0.0, 1.0)
+
+    l_content = content_loss_fn(hr_norm_clip, sr_norm_clip)
     l_adv = generator_adversarial_loss(d_fake)
 
     total_loss = l_content + lambda_adv * l_adv
 
     if lambda_pixel > 0.0:
-        l_pixel = pixel_loss(hr, sr_clipped)
+        l_pixel = pixel_loss(hr_norm_clip, sr_norm_clip)
         total_loss += lambda_pixel * l_pixel
     else:
         l_pixel = tf.constant(0.0)
