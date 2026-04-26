@@ -13,7 +13,6 @@ from api.celery_app import celery
 
 app = Flask(__name__)
 
-model = SRGANGenerator("weights/srresnet_finetuned_v6.weights.h5")
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -55,7 +54,8 @@ def home():
 def enhance():
     file = request.files["image"]
 
-    file_path = save_file(file)
+    file_path = os.path.join("/app/uploads", file.filename)
+    file.save(file_path)
 
     task = process_image.delay(file_path)
 
@@ -78,9 +78,14 @@ def result(job_id):
     
     elif task.state == 'FAILURE':
         return {"status": "failed", "error": str(task.info)}, 500
-
-    elif task.status != "SUCCESS":
-        return {"error": "not ready"}
+    
+    elif task.state == 'SUCCESS':
+        # task.result містить шлях, який повернула функція enhance_large_image
+        file_path = task.result 
+        try:
+            return send_file(file_path, mimetype='image/png')
+        except Exception as e:
+            return {"status": "error", "message": "File not found on server"}, 404
 
     return send_file(task.result)
 

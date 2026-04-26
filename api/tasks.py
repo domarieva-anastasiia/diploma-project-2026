@@ -1,8 +1,42 @@
+import numpy as np
+from PIL import Image
+import os
 from .celery_app import celery
 from inference.patching import enhance_large_image
+from models.srresnet import build_srresnet
+
+# Ініціалізуємо модель глобально
+model = None
+
+def get_model():
+    global model
+    if model is None:
+        print("Loading model weights...")
+        model = build_srresnet()
+        model.load_weights("weights/srresnet_finetuned_v6.weights.h5")
+        print("Model loaded successfully!")
+    return model
 
 @celery.task(bind=True)
 def process_image(self, file_path):
+
+    sr_model = get_model()
+
+    # Відкриваємо файл за шляхом, який передав API
+    image = Image.open(file_path).convert("RGB")
+    image = np.array(image).astype("float32") 
+
+    sr = enhance_large_image(image, sr_model)
+
+    # Пост-обробка (обрізаємо значення та міняємо тип на картинку)
+    sr = np.clip(sr, 0, 255).astype("uint8")
+    img = Image.fromarray(sr)
+
+    # Створюємо назву для результату на основі вхідного імені
+    filename = os.path.basename(file_path)
+    result_filename = f"enhanced_{filename.split('.')[0]}.png"
+    result_path = os.path.join("/app/results", result_filename)
     
-    result_path = enhance_large_image(file_path)
+    img.save(result_path, format="PNG")
+    
     return result_path
