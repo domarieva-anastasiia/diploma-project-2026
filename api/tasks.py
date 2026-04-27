@@ -19,6 +19,14 @@ def get_model():
 
 @celery.task(bind=True)
 def process_image(self, file_path):
+    self.update_state(state="STARTED")
+
+    def update_progress(p):
+        if p % 5 == 0:
+            self.update_state(
+                state="PROGRESS",
+                meta={"progress": p}
+            )
 
     sr_model = get_model()
 
@@ -26,7 +34,7 @@ def process_image(self, file_path):
     image = Image.open(file_path).convert("RGB")
     image = np.array(image).astype("float32") 
 
-    sr = enhance_large_image(image, sr_model)
+    sr = enhance_large_image(image, sr_model, progress_callback=update_progress)
 
     # Пост-обробка (обрізаємо значення та міняємо тип на картинку)
     sr = np.clip(sr, 0, 255).astype("uint8")

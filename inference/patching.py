@@ -56,7 +56,7 @@ def merge_patches(patches, positions, image_shape, patch_size, scale):
     weight[weight == 0] = 1.0
     return result / weight
 
-def enhance_large_image(image, model, patch_size=64, overlap=24, scale=4):
+def enhance_large_image(image, model, patch_size=64, overlap=24, scale=4, progress_callback=None):
     stride = patch_size - overlap
 
     padded, orig_h, orig_w = pad_image(image, patch_size)
@@ -64,12 +64,18 @@ def enhance_large_image(image, model, patch_size=64, overlap=24, scale=4):
     patches, positions = split_into_patches(padded, patch_size, stride)
 
     sr_patches = []
+    total = len(patches)
+  
 
     for patch in patches:
         patch = np.expand_dims(patch, axis=0)
         sr = model(patch, training=False)
         sr = sr.numpy()[0]
         sr_patches.append(sr)
+
+        if progress_callback is not None:
+            progress = int((i + 1) / total * 100)
+            progress_callback(progress)
 
     sr_image = merge_patches(
         sr_patches,
