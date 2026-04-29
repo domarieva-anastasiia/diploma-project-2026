@@ -56,7 +56,7 @@ def merge_patches(patches, positions, image_shape, patch_size, scale):
     weight[weight == 0] = 1.0
     return result / weight
 
-def enhance_large_image(image, model, patch_size=64, overlap=24, scale=4, progress_callback=None):
+def enhance_large_image(image, model, patch_size=128, overlap=12, scale=4, batch_size=8, progress_callback=None):
     stride = patch_size - overlap
 
     padded, orig_h, orig_w = pad_image(image, patch_size)
@@ -65,17 +65,37 @@ def enhance_large_image(image, model, patch_size=64, overlap=24, scale=4, progre
 
     sr_patches = []
     total = len(patches)
+    last_progress = -1
   
+    #обробка по патчам
+    # for patch in patches:
+    #     patch = np.expand_dims(patch, axis=0)
+    #     sr = model(patch, training=False)
+    #     sr = sr.numpy()[0]
+    #     sr_patches.append(sr)
 
-    for patch in patches:
-        patch = np.expand_dims(patch, axis=0)
-        sr = model(patch, training=False)
-        sr = sr.numpy()[0]
-        sr_patches.append(sr)
+    #     if progress_callback is not None:
+    #         progress = int((i + 1) / total * 100)
+    #         progress_callback(progress)
 
+    #обробка батчами
+    for i in range(0, total, batch_size):
+        batch = patches[i:i+batch_size]
+
+        batch = np.stack(batch, axis=0)  # (B, H, W, 3)
+
+        sr_batch = model(batch, training=False).numpy()
+
+        for sr in sr_batch:
+            sr_patches.append(sr)
+
+       
         if progress_callback is not None:
-            progress = int((i + 1) / total * 100)
-            progress_callback(progress)
+            progress = int(min(i + batch_size, total) / total * 100)
+
+            if progress != last_progress:
+                last_progress = progress
+                progress_callback(progress)
 
     sr_image = merge_patches(
         sr_patches,

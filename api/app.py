@@ -4,6 +4,7 @@ from PIL import Image
 import io
 import uuid
 import os
+import tensorflow as tf
 
 from inference.generator import SRGANGenerator
 from inference.patching import enhance_large_image
@@ -81,7 +82,8 @@ def result(job_id):
     
     elif task.state == 'SUCCESS':
         # task.result містить шлях, який повернула функція enhance_large_image
-        file_path = task.result 
+        file_path = task.result
+        print(tf.config.list_physical_devices('GPU')) 
         try:
             return send_file(file_path, mimetype='image/png')
         except Exception as e:
