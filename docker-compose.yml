@@ -23,6 +23,7 @@ services:
 
   worker:
     build: .
+    shm_size: '2gb'
     command: celery -A api.tasks worker --loglevel=info --pool=solo
     depends_on:
       - redis

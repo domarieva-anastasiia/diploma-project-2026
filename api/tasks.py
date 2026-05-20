@@ -20,13 +20,14 @@ def get_model():
 @celery.task(bind=True)
 def process_image(self, file_path):
     self.update_state(state="STARTED")
+    self.update_state(state="PROGRESS", meta={"progress": 1})
 
     def update_progress(p):
-        if p % 5 == 0:
-            self.update_state(
-                state="PROGRESS",
-                meta={"progress": p}
-            )
+        #if p % 5 == 0:
+        self.update_state(
+            state="PROGRESS",
+            meta={"progress": p}
+        )
 
     sr_model = get_model()
 

@@ -1,4 +1,4 @@
-from flask import Flask, request, send_file
+from flask import Flask, request, send_file, send_from_directory
 import numpy as np
 from PIL import Image
 import io
@@ -63,19 +63,36 @@ def enhance():
     return {"job_id": task.id}
 
 
-@app.route("/status/<job_id>")
-def status(job_id):
-    task = AsyncResult(job_id)
-
-    return {"status": task.status}
-
-
 @app.route("/result/<job_id>")
 def result(job_id):
     task = AsyncResult(job_id)
 
-    if task.state == 'PENDING':
-        return {"status": "processing"}, 202  # 202 Accepted — "ще в роботі"
+    file_path = task.result  
+    try:
+        return send_file(file_path, mimetype='image/png')
+    except Exception as e:
+        return {"status": "error", "message": e}, 404
+    
+
+@app.route("/download/<filename>")
+def download_file(filename):
+    return send_from_directory("/app/results", filename, mimetype='image/png')
+
+
+@app.route("/status/<job_id>")
+def status(job_id):
+    task = AsyncResult(job_id)
+    state = task.state
+
+    if state == 'PENDING':
+        return {"status": "PENDING", "progress": 0}, 202
+    
+    elif state == 'STARTED':
+        return {"status": "STARTED", "progress": 0}, 202
+    
+    elif state == 'PROGRESS':
+        progress_val = task.info.get("progress", 0) if isinstance(task.info, dict) else 0
+        return {"status": "PROGRESS", "progress": progress_val}, 202
     
     elif task.state == 'FAILURE':
         return {"status": "failed", "error": str(task.info)}, 500
@@ -83,13 +100,15 @@ def result(job_id):
     elif task.state == 'SUCCESS':
         # task.result містить шлях, який повернула функція enhance_large_image
         file_path = task.result
-        print(tf.config.list_physical_devices('GPU')) 
-        try:
-            return send_file(file_path, mimetype='image/png')
-        except Exception as e:
-            return {"status": "error", "message": "File not found on server"}, 404
+         
+        filename = os.path.basename(file_path)
+        return {
+            "status": "SUCCESS", 
+            "progress": 100, 
+            "download_url": f"/download/{filename}"
+        }, 200
 
-    return send_file(task.result)
+    return {"status": state}, 202
 
 
 @app.route("/cancel/<job_id>", methods=["POST"])

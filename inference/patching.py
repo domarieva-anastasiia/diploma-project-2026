@@ -1,4 +1,6 @@
 import numpy as np
+import tensorflow as tf
+import gc
 
 def pad_image(image, patch_size):
     h, w, _ = image.shape
@@ -56,7 +58,12 @@ def merge_patches(patches, positions, image_shape, patch_size, scale):
     weight[weight == 0] = 1.0
     return result / weight
 
-def enhance_large_image(image, model, patch_size=128, overlap=12, scale=4, batch_size=8, progress_callback=None):
+# oкремий метод для обробки батча, щоб TF краще оптимізував пам'ять
+@tf.function
+def predict_batch(model, batch):
+    return model(batch, training=False)
+
+def enhance_large_image(image, model, patch_size=128, overlap=12, scale=4, batch_size=4, progress_callback=None):
     stride = patch_size - overlap
 
     padded, orig_h, orig_w = pad_image(image, patch_size)
@@ -80,22 +87,25 @@ def enhance_large_image(image, model, patch_size=128, overlap=12, scale=4, batch
 
     #обробка батчами
     for i in range(0, total, batch_size):
-        batch = patches[i:i+batch_size]
+            batch_data = np.stack(patches[i:i+batch_size], axis=0)
+            
+            sr_batch = predict_batch(model, batch_data).numpy()
+            
+            for sr in sr_batch:
+                sr_patches.append(sr)
 
-        batch = np.stack(batch, axis=0)  # (B, H, W, 3)
+            if progress_callback is not None:
+                progress = int(min(i + batch_size, total) / total * 100)
 
-        sr_batch = model(batch, training=False).numpy()
+                if progress != last_progress:
+                    last_progress = progress
+                    progress_callback(progress)
+                
+            # oчищуємо пам'ять
+            if i % (batch_size * 2) == 0:
+                gc.collect()
+                tf.keras.backend.clear_session()
 
-        for sr in sr_batch:
-            sr_patches.append(sr)
-
-       
-        if progress_callback is not None:
-            progress = int(min(i + batch_size, total) / total * 100)
-
-            if progress != last_progress:
-                last_progress = progress
-                progress_callback(progress)
 
     sr_image = merge_patches(
         sr_patches,
