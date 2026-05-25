@@ -13,7 +13,7 @@ def get_model():
     if model is None:
         print("Loading model weights...")
         model = build_srresnet()
-        model.load_weights("weights/srresnet_finetuned_v6.weights.h5")
+        model.load_weights("weights/generator_patchgan_epoch_19.weights.h5")
         print("Model loaded successfully!")
     return model
 
