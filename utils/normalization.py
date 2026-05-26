@@ -7,5 +7,5 @@ def normalize_01(x):
     return x / 255.0
 
 
-def denormalize_m11(x):
+def denormalize_01(x):
     return (x + 1) * 127.5

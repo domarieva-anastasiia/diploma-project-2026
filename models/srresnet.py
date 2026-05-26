@@ -2,6 +2,7 @@ import tensorflow as tf
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Conv2D, BatchNormalization, Add, Lambda, PReLU
 
+from utils.normalization import normalize_01, denormalize_01
 
 upsamples_per_scale = {
     2: 1,
@@ -21,8 +22,10 @@ def upsample(x_in, num_filters):
 
 def residual_block(block_input, num_filters, momentum=0.8):
     x = Conv2D(num_filters, kernel_size=3, padding='same')(block_input)
+    x = BatchNormalization(momentum=momentum)(x)
     x = PReLU(shared_axes=[1, 2])(x)
     x = Conv2D(num_filters, kernel_size=3, padding='same')(x)
+    x = BatchNormalization(momentum=momentum)(x)
     x = Add()([block_input, x])
     return x
 
@@ -34,20 +37,22 @@ def build_srresnet(scale=4, num_filters=64, num_res_blocks=16):
     num_upsamples = upsamples_per_scale[scale]
 
     lr = Input(shape=(None, None, 3)) # expects [0,1]
+    x = Lambda(normalize_01)(lr) #from [0, 255] to [0, 1]
 
-    x = Conv2D(num_filters, kernel_size=9, padding='same')(lr)
-    x = PReLU(shared_axes=[1, 2])(x)
-    x_skip = x
-
+    x = Conv2D(num_filters, kernel_size=9, padding='same')(x)
+    x = x_1 = PReLU(shared_axes=[1, 2])(x)
+    
     for _ in range(num_res_blocks):
         x = residual_block(x, num_filters)
 
     x = Conv2D(num_filters, kernel_size=3, padding='same')(x)
-    x = Add()([x, x_skip])
+    x = BatchNormalization()(x)
+    x = Add()([x_1, x])
 
     for _ in range(num_upsamples):
         x = upsample(x, num_filters * 4)
 
-    sr = Conv2D(3, kernel_size=9, padding="same")(x)
+    x = Conv2D(3, kernel_size=9, padding="same")(x)
+    sr = Lambda(denormalize_01)(x) #from [0, 1] to [0, 255]
 
     return Model(lr, sr)
